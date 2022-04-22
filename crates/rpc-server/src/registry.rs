@@ -9,9 +9,10 @@ use gw_jsonrpc_types::{
     blockchain::Script,
     ckb_jsonrpc_types::{JsonBytes, Uint128, Uint32},
     godwoken::{
-        BackendInfo, ErrorTxReceipt, GlobalState, L2BlockCommittedInfo, L2BlockStatus, L2BlockView,
-        L2BlockWithStatus, L2TransactionStatus, L2TransactionWithStatus, LastL2BlockCommittedInfo,
-        NodeInfo, RegistryAddress, RunResult, TxReceipt, WithdrawalStatus, WithdrawalWithStatus,
+        BackendInfo, BackendType, EoaScript, EoaScriptType, ErrorTxReceipt, GlobalState, GwScript,
+        GwScriptType, L2BlockCommittedInfo, L2BlockStatus, L2BlockView, L2BlockWithStatus,
+        L2TransactionStatus, L2TransactionWithStatus, LastL2BlockCommittedInfo, NodeInfo,
+        NodeRollupConfig, RollupCell, RunResult, TxReceipt, WithdrawalStatus, WithdrawalWithStatus, RegistryAddress,
     },
     test_mode::TestModePayload,
 };
@@ -58,6 +59,7 @@ type AccountID = Uint32;
 type JsonH256 = ckb_fixed_hash::H256;
 type BoxedTestsRPCImpl = Box<dyn TestModeRPC + Send + Sync>;
 type GwUint64 = gw_jsonrpc_types::ckb_jsonrpc_types::Uint64;
+type GwUint32 = gw_jsonrpc_types::ckb_jsonrpc_types::Uint32;
 
 const HEADER_NOT_FOUND_ERR_CODE: i64 = -32000;
 const INVALID_NONCE_ERR_CODE: i64 = -32001;
@@ -567,9 +569,20 @@ fn get_backend_info(generator: Arc<Generator>) -> Vec<BackendInfo> {
                 validator_script_type_hash: ckb_fixed_hash::H256(
                     b.validator_script_type_hash.into(),
                 ),
+                backend_type: to_api_backend_type(&b.backend_type),
             }
         })
         .collect()
+}
+
+fn to_api_backend_type(b_type: &gw_config::BackendType) -> BackendType {
+    match b_type {
+        gw_config::BackendType::EthAddrReg => BackendType::EthAddrReg,
+        gw_config::BackendType::Meta => BackendType::Meta,
+        gw_config::BackendType::Sudt => BackendType::Sudt,
+        gw_config::BackendType::Polyjuice => BackendType::Polyjuice,
+        _ => BackendType::Unknown,
+    }
 }
 
 async fn ping() -> Result<String> {
@@ -1347,10 +1360,133 @@ async fn compute_l2_sudt_script_hash(
     Ok(to_jsonh256(l2_sudt_script.hash().into()))
 }
 
-async fn get_node_info(backend_info: Data<Vec<BackendInfo>>) -> Result<NodeInfo> {
+pub fn to_node_rollup_config(rollup_config: &RollupConfig) -> NodeRollupConfig {
+    let required_staking_capacity: GwUint64 = rollup_config
+        .required_staking_capacity()
+        .as_reader()
+        .unpack()
+        .into();
+    let challenge_maturity_blocks: GwUint64 = rollup_config
+        .challenge_maturity_blocks()
+        .as_reader()
+        .unpack()
+        .into();
+    let finality_blocks: GwUint64 = rollup_config.finality_blocks().as_reader().unpack().into();
+    //let reward_rate = rollup_config.reward_burn_rate().as_slice();
+    //reward_rate_byte32.copy_from_slice(reward_rate);
+    let reward_burn_rate: Uint64 = bytes_v10::Buf::get_u8(&mut rollup_config.reward_burn_rate().as_bytes()).into();
+    let compatible_chain_id: GwUint32 =
+        bytes_v10::Buf::get_u32(&mut rollup_config.chain_id().as_bytes()).into();
+    NodeRollupConfig {
+        required_staking_capacity,
+        challenge_maturity_blocks,
+        finality_blocks,
+        reward_burn_rate,
+        compatible_chain_id,
+    }
+}
+
+pub fn to_rollup_cell(generator: &Generator) -> RollupCell {
+    let type_hash: ckb_types::H256 = generator
+        .rollup_context()
+        .rollup_script_hash
+        .pack()
+        .unpack();
+    RollupCell { type_hash }
+}
+
+pub fn to_gw_scripts(rollup_config: &RollupConfig) -> Vec<GwScript> {
+    let mut vec = Vec::new();
+
+    let type_hash: ckb_types::H256 = rollup_config.deposit_script_type_hash().unpack();
+    let deposit = GwScript {
+        type_hash,
+        script_type: GwScriptType::Deposit,
+    };
+    vec.push(deposit);
+
+    let type_hash: ckb_types::H256 = rollup_config.withdrawal_script_type_hash().unpack();
+    let withdraw = GwScript {
+        type_hash,
+        script_type: GwScriptType::Withdraw,
+    };
+    vec.push(withdraw);
+
+    let type_hash: ckb_types::H256 = rollup_config.stake_script_type_hash().unpack();
+    let stake_lock = GwScript {
+        type_hash,
+        script_type: GwScriptType::StakeLock,
+    };
+    vec.push(stake_lock);
+
+    let type_hash: ckb_types::H256 = rollup_config.custodian_script_type_hash().unpack();
+    let custodian = GwScript {
+        type_hash,
+        script_type: GwScriptType::CustodianLock,
+    };
+    vec.push(custodian);
+
+    let type_hash: ckb_types::H256 = rollup_config.withdrawal_script_type_hash().unpack();
+    let challenge = GwScript {
+        type_hash,
+        script_type: GwScriptType::ChallengeLock,
+    };
+    vec.push(challenge);
+
+    let type_hash: ckb_types::H256 = rollup_config.l1_sudt_script_type_hash().unpack();
+    let l1_sudt = GwScript {
+        type_hash,
+        script_type: GwScriptType::L1Sudt,
+    };
+    vec.push(l1_sudt);
+
+    let type_hash: ckb_types::H256 = rollup_config.l2_sudt_validator_script_type_hash().unpack();
+    let l2_sudt = GwScript {
+        type_hash,
+        script_type: GwScriptType::L2Sudt,
+    };
+    vec.push(l2_sudt);
+
+    vec
+}
+
+pub fn to_eoa_scripts(rollup_config: &RollupConfig) -> Vec<EoaScript> {
+    let mut vec = Vec::new();
+
+    let a_type_hash = rollup_config
+        .allowed_eoa_type_hashes()
+        .get(0)
+        .expect("no 0 id in allowed_eoa_type_hashes");
+    let mut hash: [u8; 32] = [0; 32];
+    let source = a_type_hash.as_slice();
+    // todo: fix below, 33 length not eq with 32 length
+    hash.copy_from_slice(source);
+    let type_hash: JsonH256 = hash.into();
+    let eth_eoa = EoaScript {
+        type_hash,
+        eoa_type: EoaScriptType::Eth,
+    };
+    vec.push(eth_eoa);
+
+    vec
+}
+
+async fn get_node_info(
+    backend_info: Data<Vec<BackendInfo>>,
+    rollup_config: Data<RollupConfig>,
+    generator: Data<Generator>,
+) -> Result<NodeInfo> {
+    let node_rollup_config = to_node_rollup_config(&rollup_config);
+    let rollup_cell = to_rollup_cell(&generator);
+    let gw_scripts = to_gw_scripts(&rollup_config);
+    let eoa_scripts = to_eoa_scripts(&rollup_config);
     Ok(NodeInfo {
         version: Version::current().to_string(),
         backends: backend_info.clone(),
+        rollup_config: node_rollup_config,
+        rollup_cell,
+        gw_scripts,
+        eoa_scripts,
     })
 }
 
