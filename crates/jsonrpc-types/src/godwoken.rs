@@ -1253,7 +1253,7 @@ pub struct NodeRollupConfig {
     pub challenge_maturity_blocks: Uint64,
     pub finality_blocks: Uint64,
     pub reward_burn_rate: Uint32,
-    pub compatible_chain_id: Uint32,
+    pub chain_id: Uint32,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Default)]
