@@ -1214,7 +1214,7 @@ impl Default for BackendType {
 #[serde(rename_all = "snake_case")]
 pub struct GwScript {
     pub type_hash: H256,
-    //pub script: Script,
+    pub script: Script,
     pub script_type: GwScriptType,
 }
 
@@ -1243,7 +1243,7 @@ impl Default for GwScriptType {
 #[serde(rename_all = "snake_case")]
 pub struct RollupCell {
     pub type_hash: H256,
-    //pub script: Script,
+    pub script: Script,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Default)]
@@ -1260,6 +1260,7 @@ pub struct NodeRollupConfig {
 #[serde(rename_all = "snake_case")]
 pub struct EoaScript {
     pub type_hash: H256,
+    pub script: Script,
     pub eoa_type: EoaScriptType,
 }
 
@@ -1268,7 +1269,6 @@ pub struct EoaScript {
 pub enum EoaScriptType {
     Unknown,
     Eth,
-    Tron,
 }
 
 impl Default for EoaScriptType {
