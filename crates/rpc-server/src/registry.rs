@@ -267,6 +267,7 @@ impl Registry {
             .with_data(Data::new(self.mem_pool_state))
             .with_data(Data::new(self.chain_config))
             .with_data(Data::new(self.consensus_config))
+            .with_data(Data::new(self.node_mode))
             .with_method("gw_ping", ping)
             .with_method("gw_get_tip_block_hash", get_tip_block_hash)
             .with_method("gw_get_block_hash", get_block_hash)
