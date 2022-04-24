@@ -1516,9 +1516,9 @@ pub fn to_eoa_scripts(
         .allowed_eoa_type_hashes()
         .get(0)
         .expect("no 0 id in allowed_eoa_type_hashes");
+    let a_type_hash_value = a_type_hash.hash();
     let mut hash: [u8; 32] = [0; 32];
-    let source = a_type_hash.as_slice();
-    // todo: fix below, 33 length not eq with 32 length
+    let source = a_type_hash_value.as_slice();
     hash.copy_from_slice(source);
     let type_hash: JsonH256 = hash.into();
     let script = consensus_config.contract_type_scripts.allowed_eoa_scripts[&type_hash].to_owned();
