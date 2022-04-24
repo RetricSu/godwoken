@@ -64,6 +64,7 @@ type JsonH256 = ckb_fixed_hash::H256;
 type BoxedTestsRPCImpl = Box<dyn TestModeRPC + Send + Sync>;
 type GwUint64 = gw_jsonrpc_types::ckb_jsonrpc_types::Uint64;
 type GwUint32 = gw_jsonrpc_types::ckb_jsonrpc_types::Uint32;
+type ConfigNodeMode = gw_jsonrpc_types::godwoken::NodeMode;
 
 const HEADER_NOT_FOUND_ERR_CODE: i64 = -32000;
 const INVALID_NONCE_ERR_CODE: i64 = -32001;
@@ -1499,7 +1500,7 @@ pub fn to_gw_scripts(
     let l2_sudt = GwScript {
         type_hash,
         script,
-        script_type: GwScriptType::L2Sudt,
+        script_type: GwScriptType::OmniLock,
     };
     vec.push(l2_sudt);
 
@@ -1532,18 +1533,29 @@ pub fn to_eoa_scripts(
     vec
 }
 
+pub fn to_node_mode(node_mode: &NodeMode) -> ConfigNodeMode {
+    match node_mode {
+        NodeMode::FullNode => ConfigNodeMode::FullNode,
+        NodeMode::ReadOnly => ConfigNodeMode::ReadOnly,
+        NodeMode::Test => ConfigNodeMode::Test,
+    }
+}
+
 async fn get_node_info(
+    node_mode: Data<NodeMode>,
     backend_info: Data<Vec<BackendInfo>>,
     rollup_config: Data<RollupConfig>,
     generator: Data<Generator>,
-    consensus_config: Data<ConsensusConfig>,
-    chain_config: Data<ChainConfig>,
+    (consensus_config, chain_config): (Data<ConsensusConfig>, Data<ChainConfig>),
 ) -> Result<NodeInfo> {
+    let mode = to_node_mode(&node_mode);
     let node_rollup_config = to_node_rollup_config(&rollup_config);
     let rollup_cell = to_rollup_cell(&generator, &chain_config);
     let gw_scripts = to_gw_scripts(&rollup_config, &consensus_config);
     let eoa_scripts = to_eoa_scripts(&rollup_config, &consensus_config);
+
     Ok(NodeInfo {
+        mode,
         version: Version::current().to_string(),
         backends: backend_info.clone(),
         rollup_config: node_rollup_config,

@@ -1176,13 +1176,27 @@ impl From<offchain::RunResult> for RunResult {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct NodeInfo {
-    // godwoken current version
+    pub mode: NodeMode,
     pub version: String,
     pub backends: Vec<BackendInfo>,
     pub eoa_scripts: Vec<EoaScript>,
     pub gw_scripts: Vec<GwScript>,
     pub rollup_cell: RollupCell,
     pub rollup_config: NodeRollupConfig,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum NodeMode {
+    FullNode,
+    Test,
+    ReadOnly,
+}
+
+impl Default for NodeMode {
+    fn default() -> Self {
+        NodeMode::ReadOnly
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Default)]
