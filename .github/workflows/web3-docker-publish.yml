@@ -71,7 +71,7 @@ jobs:
         env:
           metatags: ${{ steps.meta.outputs.tags }}
         id: split
-        run: echo "::set-output name=tags::${metatags##*@}"
+        run: echo "::set-output name=tags::${metatags/web3@/}"
     
       # Build and push Docker image with Buildx (don't push on PR)
       # only for new tag
