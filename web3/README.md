@@ -167,4 +167,3 @@ resource:
 ### RPC Docs
 
 Get RPC docs at [RPCs doc](docs/apis.md)
-
